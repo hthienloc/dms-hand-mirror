@@ -1,0 +1,13 @@
+{
+  "id": "handMirror",
+  "name": "Hand Mirror",
+  "description": "Cozy camera preview and microphone check widget.",
+  "version": "1.0.0",
+  "author": "Contributor",
+  "type": "widget",
+  "icon": "camera_front",
+  "settings": "./HandMirrorSettings.qml",
+  "component": "./HandMirrorWidget.qml",
+  "permissions": ["settings_read", "settings_write"],
+  "capabilities": ["dankbar-widget"]
+}
