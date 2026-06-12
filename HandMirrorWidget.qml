@@ -1,68 +1,329 @@
 import QtQuick
+import QtQuick.Layouts
+import QtQuick.Effects
+import QtMultimedia
+import Quickshell
+import Quickshell.Io
 import qs.Common
 import qs.Widgets
 import qs.Modules.Plugins
+import qs.Services
 
 PluginComponent {
-    id: pluginRoot
+    id: root
 
     property var popoutService: null
 
-    MirrorWindow {
-        id: mirrorWin
-        plugin: pluginRoot
-        visible: false
-    }
+    // Sizing from configuration
+    popoutWidth: pluginData.windowWidth ?? 360
+    popoutHeight: (pluginData.windowHeight ?? 270) + 80
 
-    horizontalBarPill: Component {
-        StyledRect {
-            id: pill
-            width: Theme.iconSizeSmall + Theme.spacingM * 2
-            height: parent.widgetThickness
-            radius: Theme.cornerRadius
-            color: mirrorWin.visible ? Theme.primaryContainer : Theme.surfaceContainerHigh
+    // Microphone level state
+    property int micLevel: 0
 
-            DankIcon {
-                anchors.centerIn: parent
-                name: "camera_front"
-                size: Theme.iconSizeSmall
-                color: mirrorWin.visible ? Theme.onPrimaryContainer : Theme.surfaceText
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                hoverEnabled: true
-                onClicked: {
-                    mirrorWin.visible = !mirrorWin.visible;
-                    if (mirrorWin.visible) {
-                        mirrorWin.updatePosition();
-                    }
+    // Real-time microphone level collector
+    Process {
+        id: micProcess
+        command: ["arecord", "-D", "default", "-f", "S16_LE", "-r", "8000", "-t", "raw", "/dev/null", "-V", "mono"]
+        running: (pluginPopout && pluginPopout.shouldBeVisible) && (pluginData.micCheckEnabled ?? true)
+        
+        stderr: SplitParser {
+            splitMarker: "\n"
+            onRead: (data) => {
+                const match = data.match(/(\d+)%/);
+                if (match) {
+                    root.micLevel = parseInt(match[1]);
                 }
             }
         }
     }
 
-    verticalBarPill: Component {
-        StyledRect {
-            width: parent.widgetThickness
-            height: Theme.iconSizeSmall + Theme.spacingM * 2
-            radius: Theme.cornerRadius
-            color: mirrorWin.visible ? Theme.primaryContainer : Theme.surfaceContainerHigh
+    horizontalBarPill: Component {
+        Item {
+            implicitWidth: Theme.iconSizeSmall
+            implicitHeight: Theme.iconSize
+            anchors.verticalCenter: parent.verticalCenter
 
             DankIcon {
                 anchors.centerIn: parent
                 name: "camera_front"
                 size: Theme.iconSizeSmall
-                color: mirrorWin.visible ? Theme.onPrimaryContainer : Theme.surfaceText
+                color: (pluginPopout && pluginPopout.shouldBeVisible) ? Theme.primary : Theme.surfaceText
             }
+        }
+    }
 
-            MouseArea {
-                anchors.fill: parent
-                hoverEnabled: true
-                onClicked: {
-                    mirrorWin.visible = !mirrorWin.visible;
-                    if (mirrorWin.visible) {
-                        mirrorWin.updatePosition();
+    verticalBarPill: Component {
+        Item {
+            implicitWidth: Theme.iconSize
+            implicitHeight: Theme.iconSizeSmall
+            anchors.horizontalCenter: parent.horizontalCenter
+
+            DankIcon {
+                anchors.centerIn: parent
+                name: "camera_front"
+                size: Theme.iconSizeSmall
+                color: (pluginPopout && pluginPopout.shouldBeVisible) ? Theme.primary : Theme.surfaceText
+            }
+        }
+    }
+
+    popoutContent: Component {
+        PopoutComponent {
+            id: popoutComp
+            headerText: I18n.tr("Hand Mirror")
+            showCloseButton: true
+
+            Item {
+                width: parent.width
+                height: pluginData.windowHeight ?? 270
+
+                // 1. Camera View panel
+                StyledRect {
+                    id: cameraViewPanel
+                    anchors.fill: parent
+                    radius: pluginData.borderRadius ?? 16
+                    color: Theme.surfaceContainer
+                    clip: true
+                    visible: !snapOverlay.visible
+
+                    // Camera Device Binding
+                    CaptureSession {
+                        id: captureSession
+                        camera: Camera {
+                            id: camera
+                            active: (pluginPopout && pluginPopout.shouldBeVisible) && !snapOverlay.visible
+                            cameraDevice: {
+                                const index = pluginData.cameraIndex ?? 0;
+                                const devices = MediaDevices.videoInputs;
+                                if (devices && devices.length > index) {
+                                    return devices[index];
+                                }
+                                return MediaDevices.defaultVideoInput;
+                            }
+                        }
+                        videoOutput: videoOutput
+                    }
+
+                    VideoOutput {
+                        id: videoOutput
+                        width: parent.width * (pluginData.zoomFactor ?? 1.0)
+                        height: parent.height * (pluginData.zoomFactor ?? 1.0)
+                        anchors.centerIn: parent
+                        fillMode: VideoOutput.PreserveAspectCrop
+                        
+                        layer.enabled: true
+                        layer.effect: MultiEffect {
+                            maskEnabled: true
+                            maskSource: ShaderEffectSource {
+                                sourceItem: Rectangle {
+                                    width: cameraViewPanel.width
+                                    height: cameraViewPanel.height
+                                    radius: cameraViewPanel.radius
+                                }
+                            }
+                        }
+                    }
+
+                    // Mic level visual meter overlay
+                    StyledRect {
+                        id: micBar
+                        width: 6
+                        height: parent.height - 80
+                        anchors.left: parent.left
+                        anchors.leftMargin: 12
+                        anchors.verticalCenter: parent.verticalCenter
+                        radius: 3
+                        color: Qt.rgba(0, 0, 0, 0.4)
+                        visible: pluginData.micCheckEnabled ?? true
+
+                        Rectangle {
+                            width: parent.width
+                            height: parent.height * (root.micLevel / 100.0)
+                            anchors.bottom: parent.bottom
+                            radius: parent.radius
+                            color: root.micLevel > 70 ? Theme.error : (root.micLevel > 40 ? Theme.warning : Theme.primary)
+                            
+                            Behavior on height {
+                                NumberAnimation { duration: 60; easing.type: Easing.OutQuad }
+                            }
+                        }
+                    }
+
+                    // Control actions row overlay
+                    Row {
+                        anchors.bottom: parent.bottom
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottomMargin: 12
+                        spacing: 12
+
+                        // Snapshot button
+                        StyledRect {
+                            width: 36
+                            height: 36
+                            radius: 18
+                            color: Qt.rgba(0, 0, 0, 0.6)
+                            border.color: "white"
+                            border.width: 1.5
+
+                            DankIcon {
+                                anchors.centerIn: parent
+                                name: "photo_camera"
+                                size: 16
+                                color: "white"
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onEntered: parent.color = Qt.rgba(0, 0, 0, 0.8)
+                                onExited: parent.color = Qt.rgba(0, 0, 0, 0.6)
+                                onClicked: {
+                                    videoOutput.grabToImage(function(result) {
+                                        snapImage.source = result.url;
+                                        snapOverlay.visible = true;
+                                        drawingCanvas.clear();
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2. Polaroid snap and draw overlay
+                StyledRect {
+                    id: snapOverlay
+                    anchors.fill: parent
+                    color: Theme.surfaceContainerHighest
+                    visible: false
+                    radius: pluginData.borderRadius ?? 16
+
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        spacing: 8
+
+                        // Polaroid layout representation
+                        Rectangle {
+                            id: polaroidCard
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            color: "white"
+                            radius: 8
+                            border.color: "#d0d0d0"
+                            border.width: 1
+
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 8
+                                spacing: 8
+
+                                // Taken snapshot image area
+                                Item {
+                                    id: imageContainer
+                                    width: parent.width
+                                    height: parent.height - 36 // whitespace
+
+                                    Image {
+                                        id: snapImage
+                                        anchors.fill: parent
+                                        fillMode: Image.PreserveAspectCrop
+                                        cache: false
+                                    }
+
+                                    // Annotation Canvas
+                                    Canvas {
+                                        id: drawingCanvas
+                                        anchors.fill: parent
+                                        property real lastX: 0
+                                        property real lastY: 0
+
+                                        function clear() {
+                                            const ctx = getContext("2d");
+                                            ctx.clearRect(0, 0, width, height);
+                                            requestPaint();
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            onPressed: (mouse) => {
+                                                drawingCanvas.lastX = mouse.x;
+                                                drawingCanvas.lastY = mouse.y;
+                                            }
+                                            onPositionChanged: (mouse) => {
+                                                const ctx = drawingCanvas.getContext("2d");
+                                                ctx.strokeStyle = pluginData.penColor ?? "#e91e63";
+                                                ctx.lineWidth = pluginData.penWidth ?? 4;
+                                                ctx.lineCap = "round";
+                                                ctx.lineJoin = "round";
+
+                                                ctx.beginPath();
+                                                ctx.moveTo(drawingCanvas.lastX, drawingCanvas.lastY);
+                                                ctx.lineTo(mouse.x, mouse.y);
+                                                ctx.stroke();
+
+                                                drawingCanvas.lastX = mouse.x;
+                                                drawingCanvas.lastY = mouse.y;
+                                                drawingCanvas.requestPaint();
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Bottom polaroid write space
+                                Item {
+                                    width: parent.width
+                                    height: 20
+                                    StyledText {
+                                        anchors.centerIn: parent
+                                        text: I18n.tr("Snap!")
+                                        color: "#777777"
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        font.italic: true
+                                    }
+                                }
+                            }
+                        }
+
+                        // Polaroid control action buttons
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            DankButton {
+                                Layout.fillWidth: true
+                                text: I18n.tr("Clear")
+                                onClicked: drawingCanvas.clear()
+                            }
+
+                            DankButton {
+                                Layout.fillWidth: true
+                                text: I18n.tr("Save")
+                                onClicked: {
+                                    const filename = "Snap_" + new Date().getTime() + ".png";
+                                    const saveDir = Quickshell.env("HOME") + "/Pictures/Snaps";
+                                    
+                                    Proc.runCommand("mkdir-snaps", ["mkdir", "-p", saveDir], function(stdout, exitCode) {
+                                        if (exitCode === 0) {
+                                            polaroidCard.grabToImage(function(result) {
+                                                const fullPath = saveDir + "/" + filename;
+                                                result.saveToFile(fullPath);
+                                                ToastService?.showInfo(I18n.tr("Snapshot saved"), fullPath);
+                                                snapOverlay.visible = false;
+                                            });
+                                        } else {
+                                            ToastService?.showError(I18n.tr("Error"), I18n.tr("Could not create snaps directory."));
+                                        }
+                                    });
+                                }
+                            }
+
+                            DankButton {
+                                Layout.fillWidth: true
+                                text: I18n.tr("Cancel")
+                                onClicked: snapOverlay.visible = false
+                            }
+                        }
                     }
                 }
             }
