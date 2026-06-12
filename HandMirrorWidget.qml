@@ -14,28 +14,32 @@ PluginComponent {
 
     property var popoutService: null
 
-    // Sizing from configuration
-    popoutWidth: pluginData.windowWidth ?? 360
-    popoutHeight: (pluginData.windowHeight ?? 270) + 80
+    // ── Config properties (reactive: update when settings change) ──
+    readonly property int   cfg_windowWidth:   pluginData.windowSize    ?? 360
+    readonly property int   cfg_cameraIndex:   parseInt(pluginData.cameraIndex ?? "0")
+    readonly property real  cfg_zoomFactor:    (pluginData.zoomFactor ?? 100) / 100.0
+    readonly property int   cfg_borderRadius:  pluginData.borderRadius  ?? 16
+    readonly property string cfg_penColor:     pluginData.penColor      ?? "#e91e63"
+    readonly property int   cfg_penWidth:      pluginData.penWidth      ?? 4
 
-    // Microphone level state
-    property int micLevel: 0
-
-    // Real-time microphone level collector
-    Process {
-        id: micProcess
-        command: ["arecord", "-D", "default", "-f", "S16_LE", "-r", "8000", "-t", "raw", "/dev/null", "-V", "mono"]
-        running: (pluginPopout && pluginPopout.shouldBeVisible) && (pluginData.micCheckEnabled ?? true)
-        
-        stderr: SplitParser {
-            splitMarker: "\n"
-            onRead: (data) => {
-                const match = data.match(/(\d+)%/);
-                if (match) {
-                    root.micLevel = parseInt(match[1]);
-                }
-            }
+    // Dynamic aspect ratio calculation
+    property real cameraRatio: {
+        if (videoOutput && videoOutput.sourceRect.width > 0 && videoOutput.sourceRect.height > 0) {
+            return videoOutput.sourceRect.width / videoOutput.sourceRect.height;
         }
+        return 4.0 / 3.0; // Fallback to classic 4:3
+    }
+
+    popoutWidth:  cfg_windowWidth
+    popoutHeight: Math.round(cfg_windowWidth / cameraRatio)
+
+    onCfg_windowWidthChanged: {
+        root.popoutWidth = cfg_windowWidth;
+        root.popoutHeight = Math.round(cfg_windowWidth / cameraRatio);
+    }
+    
+    onCameraRatioChanged: {
+        root.popoutHeight = Math.round(root.popoutWidth / cameraRatio);
     }
 
     horizontalBarPill: Component {
@@ -49,6 +53,17 @@ PluginComponent {
                 name: "camera_front"
                 size: Theme.iconSizeSmall
                 color: (pluginPopout && pluginPopout.shouldBeVisible) ? Theme.primary : Theme.surfaceText
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: (mouse) => {
+                    if (mouse.button === Qt.LeftButton) {
+                        root.triggerPopout();
+                    }
+                }
             }
         }
     }
@@ -64,6 +79,17 @@ PluginComponent {
                 name: "camera_front"
                 size: Theme.iconSizeSmall
                 color: (pluginPopout && pluginPopout.shouldBeVisible) ? Theme.primary : Theme.surfaceText
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: (mouse) => {
+                    if (mouse.button === Qt.LeftButton) {
+                        root.triggerPopout();
+                    }
+                }
             }
         }
     }
@@ -120,36 +146,6 @@ PluginComponent {
                                     width: cameraViewPanel.width
                                     height: cameraViewPanel.height
                                     radius: cameraViewPanel.radius
-                                }
-                            }
-                        }
-                    }
-
-                    // Wavy Audio visualizer (bottom left)
-                    Row {
-                        id: micWave
-                        anchors.left: parent.left
-                        anchors.bottom: parent.bottom
-                        anchors.leftMargin: 16
-                        anchors.bottomMargin: 16
-                        spacing: 2
-                        visible: pluginData.micCheckEnabled ?? true
-
-                        readonly property real maxBarHeight: 20
-                        readonly property real minBarHeight: 4
-                        readonly property var multipliers: [0.3, 0.6, 1.0, 0.7, 0.4]
-
-                        Repeater {
-                            model: 5
-                            Rectangle {
-                                width: 3
-                                height: micWave.minBarHeight + (root.micLevel / 100.0) * (micWave.maxBarHeight - micWave.minBarHeight) * micWave.multipliers[index]
-                                radius: 1.5
-                                color: root.micLevel > 70 ? Theme.error : (root.micLevel > 40 ? Theme.warning : Theme.primary)
-                                anchors.verticalCenter: parent.verticalCenter
-
-                                Behavior on height {
-                                    NumberAnimation { duration: 60; easing.type: Easing.OutQuad }
                                 }
                             }
                         }
@@ -224,26 +220,24 @@ PluginComponent {
                             property real startX
                             property real startY
                             property real startWidth
-                            property real startHeight
 
                             onPressed: (mouse) => {
                                 startX = mouse.x;
                                 startY = mouse.y;
                                 startWidth = root.popoutWidth;
-                                startHeight = root.popoutHeight;
                             }
 
                             onPositionChanged: (mouse) => {
                                 const deltaX = mouse.x - startX;
-                                const deltaY = mouse.y - startY;
                                 
-                                root.popoutWidth = Math.max(200, Math.min(800, startWidth + deltaX));
-                                root.popoutHeight = Math.max(150, Math.min(600, startHeight + deltaY));
+                                root.popoutWidth = Math.max(160, Math.min(800, startWidth + deltaX));
+                                root.popoutHeight = Math.round(root.popoutWidth / root.cameraRatio);
                             }
 
                             onReleased: {
-                                pluginService?.savePluginData(pluginId, "windowWidth", root.popoutWidth);
-                                pluginService?.savePluginData(pluginId, "windowHeight", root.popoutHeight - 80);
+                                if (pluginService) {
+                                    pluginService.savePluginData(pluginId, "windowSize", root.popoutWidth);
+                                }
                             }
                         }
                     }
@@ -367,11 +361,15 @@ PluginComponent {
                                             polaroidCard.grabToImage(function(result) {
                                                 const fullPath = saveDir + "/" + filename;
                                                 result.saveToFile(fullPath);
-                                                ToastService?.showInfo(I18n.tr("Snapshot saved"), fullPath);
+                                                if (typeof ToastService !== "undefined" && ToastService) {
+                                                    ToastService.showInfo(I18n.tr("Snapshot saved"), fullPath);
+                                                }
                                                 snapOverlay.visible = false;
                                             });
                                         } else {
-                                            ToastService?.showError(I18n.tr("Error"), I18n.tr("Could not create snaps directory."));
+                                            if (typeof ToastService !== "undefined" && ToastService) {
+                                                ToastService.showError(I18n.tr("Error"), I18n.tr("Could not create snaps directory."));
+                                            }
                                         }
                                     });
                                 }

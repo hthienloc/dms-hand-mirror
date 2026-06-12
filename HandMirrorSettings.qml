@@ -128,25 +128,14 @@ PluginSettings {
     SettingsCard {
         id: utilitiesSection
         SectionTitle { 
-            text: I18n.tr("Audio & Snapshot Features")
-            icon: "mic" 
-            showReset: micCheckEnabled.isDirty || penColor.isDirty || penWidth.isDirty
+            text: I18n.tr("Snapshot Features")
+            icon: "photo_camera" 
+            showReset: penColor.isDirty || penWidth.isDirty
             onResetClicked: {
-                micCheckEnabled.resetToDefault();
                 penColor.resetToDefault();
                 penWidth.resetToDefault();
             }
         }
-
-        ToggleSettingPlus {
-            id: micCheckEnabled
-            settingKey: "micCheckEnabled"
-            label: I18n.tr("Microphone Check")
-            description: I18n.tr("Show mic levels on the side of the mirror window.")
-            defaultValue: true
-        }
-
-        Separator {}
 
         SelectionSettingPlus {
             id: penColor
