@@ -76,7 +76,7 @@ PluginComponent {
 
             Item {
                 width: parent.width
-                height: pluginData.windowHeight ?? 270
+                height: root.popoutHeight - 80
 
                 // 1. Camera View panel
                 StyledRect {
@@ -125,32 +125,37 @@ PluginComponent {
                         }
                     }
 
-                    // Mic level visual meter overlay
-                    StyledRect {
-                        id: micBar
-                        width: 6
-                        height: parent.height - 80
+                    // Wavy Audio visualizer (bottom left)
+                    Row {
+                        id: micWave
                         anchors.left: parent.left
-                        anchors.leftMargin: 12
-                        anchors.verticalCenter: parent.verticalCenter
-                        radius: 3
-                        color: Qt.rgba(0, 0, 0, 0.4)
+                        anchors.bottom: parent.bottom
+                        anchors.leftMargin: 16
+                        anchors.bottomMargin: 16
+                        spacing: 2
                         visible: pluginData.micCheckEnabled ?? true
 
-                        Rectangle {
-                            width: parent.width
-                            height: parent.height * (root.micLevel / 100.0)
-                            anchors.bottom: parent.bottom
-                            radius: parent.radius
-                            color: root.micLevel > 70 ? Theme.error : (root.micLevel > 40 ? Theme.warning : Theme.primary)
-                            
-                            Behavior on height {
-                                NumberAnimation { duration: 60; easing.type: Easing.OutQuad }
+                        readonly property real maxBarHeight: 20
+                        readonly property real minBarHeight: 4
+                        readonly property var multipliers: [0.3, 0.6, 1.0, 0.7, 0.4]
+
+                        Repeater {
+                            model: 5
+                            Rectangle {
+                                width: 3
+                                height: micWave.minBarHeight + (root.micLevel / 100.0) * (micWave.maxBarHeight - micWave.minBarHeight) * micWave.multipliers[index]
+                                radius: 1.5
+                                color: root.micLevel > 70 ? Theme.error : (root.micLevel > 40 ? Theme.warning : Theme.primary)
+                                anchors.verticalCenter: parent.verticalCenter
+
+                                Behavior on height {
+                                    NumberAnimation { duration: 60; easing.type: Easing.OutQuad }
+                                }
                             }
                         }
                     }
 
-                    // Control actions row overlay
+                    // Control actions row overlay (bottom center)
                     Row {
                         anchors.bottom: parent.bottom
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -185,6 +190,60 @@ PluginComponent {
                                         drawingCanvas.clear();
                                     });
                                 }
+                            }
+                        }
+                    }
+
+                    // Premium Canvas Resize Grip (bottom right)
+                    Canvas {
+                        id: resizeCanvas
+                        width: 12
+                        height: 12
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.rightMargin: 6
+                        anchors.bottomMargin: 6
+
+                        onPaint: {
+                            const ctx = getContext("2d");
+                            ctx.clearRect(0, 0, width, height);
+                            ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.6);
+                            ctx.lineWidth = 1.5;
+                            ctx.beginPath();
+                            ctx.moveTo(12, 0); ctx.lineTo(0, 12);
+                            ctx.moveTo(12, 4); ctx.lineTo(4, 12);
+                            ctx.moveTo(12, 8); ctx.lineTo(8, 12);
+                            ctx.stroke();
+                        }
+
+                        MouseArea {
+                            id: resizeGrip
+                            anchors.fill: parent
+                            cursorShape: Qt.SizeFDiagCursor
+                            
+                            property real startX
+                            property real startY
+                            property real startWidth
+                            property real startHeight
+
+                            onPressed: (mouse) => {
+                                startX = mouse.x;
+                                startY = mouse.y;
+                                startWidth = root.popoutWidth;
+                                startHeight = root.popoutHeight;
+                            }
+
+                            onPositionChanged: (mouse) => {
+                                const deltaX = mouse.x - startX;
+                                const deltaY = mouse.y - startY;
+                                
+                                root.popoutWidth = Math.max(200, Math.min(800, startWidth + deltaX));
+                                root.popoutHeight = Math.max(150, Math.min(600, startHeight + deltaY));
+                            }
+
+                            onReleased: {
+                                pluginService?.savePluginData(pluginId, "windowWidth", root.popoutWidth);
+                                pluginService?.savePluginData(pluginId, "windowHeight", root.popoutHeight - 80);
                             }
                         }
                     }
