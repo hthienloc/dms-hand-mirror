@@ -1,23 +1,55 @@
-# Hand Mirror for DankMaterialShell
+# DMS Hand Mirror
 
-A cozy camera preview and microphone check widget for DankMaterialShell (DMS). Inspired by the macOS "Hand Mirror" app.
+Cozy camera preview plugin for DankMaterialShell (DMS). Inspired by the macOS "Hand Mirror" app.
+
+<img src="screenshot.png" width="800" alt="Screenshot">
+
+## Install
+
+Use the DMS CLI:
+```bash
+dms plugins install handMirror
+```
+
+Or manually:
+```bash
+git clone https://github.com/hthienloc/dms-hand-mirror ~/.config/DankMaterialShell/plugins/handMirror
+```
 
 ## Features
 
-- **Cozy Camera Preview**: One-click camera check directly from the DankBar status pill.
-- **Draggable & Resizable**: Drag the window anywhere on your Wayland workspace or double-click to center it.
-- **Polaroid Snaps**: Capture frames as Polaroid-style cards, annotate/draw over them with a stylus/mouse, and save them directly to `~/Pictures/Snaps/`.
-- **Mic Check**: Real-time microphone input level indicator on the side of the mirror window.
-- **Visual Options**: Configurable digital zoom, border radius, window sizes, and spawn positions (Center, Top-Right, Top-Left, Bottom-Right, Bottom-Left).
+- **Camera Preview:** Instant camera check from the DankBar status pill.
+- **Snapshot:** Capture frames with optional countdown delay (3s, 5s, 10s) and custom save directory.
+- **Screen Flash:** Toggleable flash animation on snapshot.
 
-## Installation
+### Bar Interactions
 
-1. Copy or symlink this directory into your DMS plugins folder:
-   ```bash
-   ln -s /path/to/dms-hand-mirror ~/.config/DankMaterialShell/plugins/HandMirror
-   ```
-2. Run `dms restart` to reload the shell.
-3. Open DMS Settings > Plugins, scan/enable **Hand Mirror**, and add it to your bar layout.
+| Action | Result |
+|--------|--------|
+| **Left Click** | Toggle popout preview |
+| **Right Click** | Open floating window (pin to desktop) |
+
+### Popout Controls
+
+- **Scroll Wheel:** Adjust digital zoom.
+- **Left Drag:** Pan zoom focal position.
+- **Snapshot button:** Capture with configured delay and save to configured directory.
+- **Pin button:** Detach camera into a floating window.
+
+### Floating Window Controls
+
+- **Right Drag:** Pan zoom focal position.
+- **Scroll Wheel:** Adjust digital zoom.
+
+## Requirements
+
+- DankMaterialShell >= 1.5
+
+## TODO / Roadmap
+
+- [ ] Interactive drawing / annotation on snapshots.
+- [ ] Customizable pen color & brush width.
+- [ ] Real-time microphone input peak level indicator.
 
 ## License
 

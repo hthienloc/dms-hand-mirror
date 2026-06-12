@@ -1,9 +1,9 @@
 {
   "id": "handMirror",
   "name": "Hand Mirror",
-  "description": "Cozy camera preview and microphone check widget.",
+  "description": "Cozy camera preview widget.",
   "version": "1.0.0",
-  "author": "Contributor",
+  "author": "Loc Huynh",
   "type": "widget",
   "icon": "camera_front",
   "settings": "./HandMirrorSettings.qml",

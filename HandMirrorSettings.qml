@@ -9,16 +9,30 @@ PluginSettings {
     id: root
     pluginId: "handMirror"
 
+    function getCameraOptions() {
+        const devices = MediaDevices.videoInputs;
+        if (!devices || devices.length === 0) {
+            return [{ label: I18n.tr("Default Camera"), value: "0" }];
+        }
+        let opts = [];
+        for (let i = 0; i < devices.length; i++) {
+            opts.push({ label: devices[i].description || ("Camera " + i), value: String(i) });
+        }
+        return opts;
+    }
+
     SettingsCard {
         id: cameraSection
         SectionTitle { 
             text: I18n.tr("Camera & Layout")
             icon: "videocam" 
-            showReset: cameraIndex.isDirty || zoomFactor.isDirty || borderRadius.isDirty
+            showReset: cameraIndex.isDirty || zoomFactor.isDirty || borderRadius.isDirty || screenFlash.isDirty || captureDelay.isDirty
             onResetClicked: {
                 cameraIndex.resetToDefault();
                 zoomFactor.resetToDefault();
                 borderRadius.resetToDefault();
+                screenFlash.resetToDefault();
+                captureDelay.resetToDefault();
             }
         }
 
@@ -26,18 +40,26 @@ PluginSettings {
             id: cameraIndex
             settingKey: "cameraIndex"
             label: I18n.tr("Select Camera")
-            options: {
-                const devices = MediaDevices.videoInputs;
-                if (!devices || devices.length === 0) {
-                    return [{ label: I18n.tr("Default Camera"), value: 0 }];
-                }
-                let opts = [];
-                for (let i = 0; i < devices.length; i++) {
-                    opts.push({ label: devices[i].description || ("Camera " + i), value: i });
-                }
-                return opts;
-            }
-            defaultValue: 0
+            options: root.getCameraOptions()
+            defaultValue: "0"
+        }
+
+        Separator {}
+
+        ToggleSettingPlus {
+            id: mirror
+            settingKey: "mirror"
+            label: I18n.tr("Mirror Image")
+            defaultValue: true
+        }
+
+        Separator {}
+
+        ToggleSettingPlus {
+            id: screenFlash
+            settingKey: "screenFlash"
+            label: I18n.tr("Screen Flash on Snapshot")
+            defaultValue: true
         }
 
         Separator {}
@@ -67,103 +89,105 @@ PluginSettings {
             leftLabel: "0"
             rightLabel: "64"
         }
+
+        Separator {}
+
+        SelectionSettingPlus {
+            id: captureDelay
+            settingKey: "captureDelay"
+            label: I18n.tr("Capture Delay")
+            options: [
+                { label: I18n.tr("Instant"), value: "0" },
+                { label: I18n.tr("3 Seconds"), value: "3" },
+                { label: I18n.tr("5 Seconds"), value: "5" },
+                { label: I18n.tr("10 Seconds"), value: "10" }
+            ]
+            defaultValue: "0"
+        }
+    }
+
+    SettingsCard {
+        id: popoutSection
+        SectionTitle { 
+            text: I18n.tr("Popout Configuration")
+            icon: "menu" 
+            showReset: popoutScale.isDirty
+            onResetClicked: {
+                popoutScale.resetToDefault();
+            }
+        }
+
+        SliderSettingPlus {
+            id: popoutScale
+            settingKey: "popoutScale"
+            label: I18n.tr("Popout Scale")
+            defaultValue: 100
+            minimum: 50
+            maximum: 250
+            unit: "%"
+            leftLabel: "50%"
+            rightLabel: "250%"
+        }
     }
 
     SettingsCard {
         id: windowSection
         SectionTitle { 
-            text: I18n.tr("Window Configuration")
+            text: I18n.tr("Standalone Window Configuration")
             icon: "aspect_ratio" 
-            showReset: windowWidth.isDirty || windowHeight.isDirty || spawnPosition.isDirty
+            showReset: windowScale.isDirty || aspectRatio.isDirty
             onResetClicked: {
-                windowWidth.resetToDefault();
-                windowHeight.resetToDefault();
-                spawnPosition.resetToDefault();
+                windowScale.resetToDefault();
+                aspectRatio.resetToDefault();
             }
         }
 
         SliderSettingPlus {
-            id: windowWidth
-            settingKey: "windowWidth"
-            label: I18n.tr("Window Width")
-            defaultValue: 360
-            minimum: 160
-            maximum: 800
-            unit: "px"
-            leftLabel: "160"
-            rightLabel: "800"
-        }
-
-        Separator {}
-
-        SliderSettingPlus {
-            id: windowHeight
-            settingKey: "windowHeight"
-            label: I18n.tr("Window Height")
-            defaultValue: 270
-            minimum: 120
-            maximum: 600
-            unit: "px"
-            leftLabel: "120"
-            rightLabel: "600"
+            id: windowScale
+            settingKey: "windowScale"
+            label: I18n.tr("Window Scale")
+            defaultValue: 100
+            minimum: 50
+            maximum: 250
+            unit: "%"
+            leftLabel: "50%"
+            rightLabel: "250%"
         }
 
         Separator {}
 
         SelectionSettingPlus {
-            id: spawnPosition
-            settingKey: "spawnPosition"
-            label: I18n.tr("Default Spawn Position")
+            id: aspectRatio
+            settingKey: "aspectRatio"
+            label: I18n.tr("Aspect Ratio")
             options: [
-                { label: I18n.tr("Center"), value: "center" },
-                { label: I18n.tr("Top Left"), value: "top-left" },
-                { label: I18n.tr("Top Right"), value: "top-right" },
-                { label: I18n.tr("Bottom Left"), value: "bottom-left" },
-                { label: I18n.tr("Bottom Right"), value: "bottom-right" }
+                { label: I18n.tr("Auto (Camera default)"), value: "auto" },
+                { label: I18n.tr("16:9 Widescreen"), value: "16:9" },
+                { label: I18n.tr("4:3 Standard"), value: "4:3" },
+                { label: I18n.tr("1:1 Square"), value: "1:1" }
             ]
-            defaultValue: "center"
+            defaultValue: "auto"
         }
     }
 
     SettingsCard {
-        id: utilitiesSection
+        id: snapshotSection
         SectionTitle { 
-            text: I18n.tr("Snapshot Features")
+            text: I18n.tr("Snapshot Options")
             icon: "photo_camera" 
-            showReset: penColor.isDirty || penWidth.isDirty
+            showReset: saveDirectory.isDirty
             onResetClicked: {
-                penColor.resetToDefault();
-                penWidth.resetToDefault();
+                saveDirectory.resetToDefault();
             }
         }
 
-        SelectionSettingPlus {
-            id: penColor
-            settingKey: "penColor"
-            label: I18n.tr("Snap Drawing Pen Color")
-            options: [
-                { label: I18n.tr("Pink"), value: "#e91e63" },
-                { label: I18n.tr("Red"), value: "#f44336" },
-                { label: I18n.tr("Blue"), value: "#2196f3" },
-                { label: I18n.tr("Green"), value: "#4caf50" },
-                { label: I18n.tr("Yellow"), value: "#ffeb3b" },
-                { label: I18n.tr("White"), value: "#ffffff" }
-            ]
-            defaultValue: "#e91e63"
-        }
-
-        Separator {}
-
-        SliderSettingPlus {
-            id: penWidth
-            settingKey: "penWidth"
-            label: I18n.tr("Snap Drawing Pen Thickness")
-            defaultValue: 4
-            minimum: 1
-            maximum: 10
-            unit: "px"
-            leftLabel: "1"
-            rightLabel: "10"
+        StringSettingPlus {
+            id: saveDirectory
+            settingKey: "saveDirectory"
+            label: I18n.tr("Save Directory")
+            placeholder: "~/Pictures/Snaps"
+            defaultValue: "~/Pictures/Snaps"
+            isDirectory: true
         }
     }
 
