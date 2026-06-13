@@ -47,9 +47,13 @@ git clone https://github.com/hthienloc/dms-hand-mirror ~/.config/DankMaterialShe
 
 ## TODO / Roadmap
 
-- [ ] Interactive drawing / annotation on snapshots.
-- [ ] Customizable pen color & brush width.
-- [ ] Real-time microphone input peak level indicator.
+- [ ] **Interactive drawing:** Basic annotation tools for snapshots.
+- [ ] **Microphone Indicator:** Real-time microphone input peak level indicator.
+- [ ] **Visual Filters:** Add vintage/cozy filters and skin smoothing effects.
+- [ ] **Drag-and-Drop:** Drag snapshots directly into other apps (Discord, Telegram, etc.).
+- [ ] **Recording:** Support for capturing short video clips or GIFs.
+- [ ] **QR/OCR Integration:** Quickly scan QR codes or extract text from the preview.
+- [ ] **Global Hotkey:** Toggle the mirror window with a system-wide shortcut.
 
 ## License
 
