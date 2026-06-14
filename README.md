@@ -19,7 +19,9 @@ git clone https://github.com/hthienloc/dms-hand-mirror ~/.config/DankMaterialShe
 ## Features
 
 - **Camera Preview:** Instant camera check from the DankBar status pill.
-- **Snapshot:** Capture frames with optional countdown delay (3s, 5s, 10s) and custom save directory.
+- **Snapshot:** Capture frames with optional countdown delay (3s, 5s, 10s) and trigger a preview overlay with Save, Copy, or Discard actions.
+- **Visual Filters:** Support for Grayscale, Sepia, and High Contrast filters with adjustable strength and smoothing.
+- **Native Clipboard:** Uses DMS native API for high-performance file copying to clipboard.
 - **Screen Flash:** Toggleable flash animation on snapshot.
 
 ### Bar Interactions
@@ -66,8 +68,8 @@ binds {
 
 - [ ] **Interactive drawing:** Basic annotation tools for snapshots.
 - [ ] **Microphone Indicator:** Real-time microphone input peak level indicator.
-- [ ] **Visual Filters:** Add vintage/cozy filters and skin smoothing effects.
-- [ ] **Drag-and-Drop:** Drag snapshots directly into other apps (Discord, Telegram, etc.).
+- [x] **Visual Filters:** Add vintage/cozy filters and skin smoothing effects.
+- [x] **Drag-and-Drop:** Drag snapshots directly into other apps (Discord, Telegram, etc.).
 - [ ] **Recording:** Support for capturing short video clips or GIFs.
 - [ ] **QR/OCR Integration:** Quickly scan QR codes or extract text from the preview.
 - [ ] **Customizable Popout Position:** Option to choose where the popout appears (Left, Center, Right, or near the bar icon).

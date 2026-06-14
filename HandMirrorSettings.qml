@@ -26,15 +26,63 @@ PluginSettings {
         SectionTitle { 
             text: I18n.tr("Camera & Layout")
             icon: "videocam" 
-            showReset: cameraIndex.isDirty || zoomFactor.isDirty || borderRadius.isDirty || screenFlash.isDirty || captureDelay.isDirty
+            showReset: cameraIndex.isDirty || zoomFactor.isDirty || borderRadius.isDirty || screenFlash.isDirty || captureDelay.isDirty || filterMode.isDirty || filterStrength.isDirty || smoothingAmount.isDirty
             onResetClicked: {
                 cameraIndex.resetToDefault();
                 zoomFactor.resetToDefault();
                 borderRadius.resetToDefault();
                 screenFlash.resetToDefault();
                 captureDelay.resetToDefault();
+                filterMode.resetToDefault();
+                filterStrength.resetToDefault();
+                smoothingAmount.resetToDefault();
             }
         }
+
+        SelectionSettingPlus {
+            id: filterMode
+            settingKey: "filterMode"
+            label: I18n.tr("Visual Filter")
+            options: [
+                { label: I18n.tr("None"), value: "none" },
+                { label: I18n.tr("Grayscale"), value: "grayscale" },
+                { label: I18n.tr("Sepia"), value: "sepia" },
+                { label: I18n.tr("High Contrast"), value: "contrast" }
+            ]
+            defaultValue: "none"
+        }
+
+        Separator { visible: filterMode.value !== "none" }
+
+        SliderSettingPlus {
+            id: filterStrength
+            settingKey: "filterStrength"
+            label: I18n.tr("Filter Strength")
+            defaultValue: 100
+            minimum: 0
+            maximum: 100
+            unit: "%"
+            leftLabel: "0%"
+            rightLabel: "100%"
+            visible: filterMode.value !== "none"
+        }
+
+        Separator {}
+
+        SliderSettingPlus {
+            id: smoothingAmount
+            settingKey: "smoothingAmount"
+            label: I18n.tr("Smoothing (Denoise)")
+            description: I18n.tr("Reduces camera noise by softening the image.")
+            defaultValue: 0
+            minimum: 0
+            maximum: 100
+            unit: "%"
+            leftLabel: "Off"
+            rightLabel: "Max"
+        }
+
+        Separator {}
 
         SelectionSettingPlus {
             id: cameraIndex

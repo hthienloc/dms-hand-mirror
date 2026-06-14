@@ -9,12 +9,17 @@ import qs.Common
 import qs.Widgets
 import qs.Modules.Plugins
 import qs.Services
+import "./dms-common"
 
 PluginComponent {
     id: root
 
     property var popoutService: null
     property bool popoutOpen: false
+    
+    // Snapshot preview states
+    property string previewPath: ""
+    property bool isPreviewing: false
 
     // ── Config properties (reactive: update when settings change) ──
     readonly property int    cfg_popoutScale:   root.pluginData.popoutScale    ?? 100
@@ -25,6 +30,9 @@ PluginComponent {
     readonly property int    cfg_borderRadius:  root.pluginData.borderRadius   ?? 16
     readonly property bool   cfg_mirror:        root.pluginData.mirror         ?? true
     readonly property bool   cfg_screenFlash:   root.pluginData.screenFlash    ?? true
+    readonly property string cfg_filterMode:    root.pluginData.filterMode     ?? "none"
+    readonly property real   cfg_filterStrength: (root.pluginData.filterStrength ?? 100) / 100.0
+    readonly property real   cfg_smoothing:      (root.pluginData.smoothingAmount ?? 0) / 100.0
 
     // Aspect ratio calculation
     property real cameraRatio: 4.0 / 3.0
@@ -36,15 +44,19 @@ PluginComponent {
     }
 
     popoutWidth:  Math.round(360 * (root.cfg_popoutScale / 100.0))
-    popoutHeight: Math.round(popoutWidth / root.activeRatio)
+    popoutHeight: Math.round(popoutWidth / root.activeRatio) + (root.isPreviewing ? 48 : 0)
 
     onCfg_popoutScaleChanged: {
         root.popoutWidth = Math.round(360 * (root.cfg_popoutScale / 100.0));
-        root.popoutHeight = Math.round(root.popoutWidth / root.activeRatio);
+        root.popoutHeight = Math.round(root.popoutWidth / root.activeRatio) + (root.isPreviewing ? 48 : 0);
     }
     
     onActiveRatioChanged: {
-        root.popoutHeight = Math.round(root.popoutWidth / root.activeRatio);
+        root.popoutHeight = Math.round(root.popoutWidth / root.activeRatio) + (root.isPreviewing ? 48 : 0);
+    }
+
+    onIsPreviewingChanged: {
+        root.popoutHeight = Math.round(root.popoutWidth / root.activeRatio) + (root.isPreviewing ? 48 : 0);
     }
 
     // Config path resolution for snapshots directory
@@ -112,6 +124,74 @@ PluginComponent {
                 return "PINNED";
             }
         }
+    }
+
+    function toggleFlash() {
+        if (root.pluginService) {
+            root.pluginService.savePluginData(root.pluginId, "screenFlash", !root.cfg_screenFlash);
+        }
+    }
+
+    function discardPreview() {
+        root.isPreviewing = false;
+        // Optional: delete temp file
+        if (root.previewPath.startsWith("/tmp/")) {
+            Proc.runCommand("cleanup-preview", ["rm", "-f", root.previewPath]);
+        }
+        root.previewPath = "";
+    }
+
+    function copyPreview() {
+        if (!root.previewPath) return;
+        DMSService.sendRequest("clipboard.copyFile", { "filePath": root.previewPath }, function(response) {
+            if (response.error) {
+                if (typeof ToastService !== "undefined" && ToastService)
+                    ToastService.showError(I18n.tr("Copy Failed"));
+            } else {
+                if (typeof ToastService !== "undefined" && ToastService)
+                    ToastService.showInfo(I18n.tr("Snapshot copied to clipboard."));
+                root.isPreviewing = false;
+            }
+        });
+    }
+
+    function savePreview() {
+        if (!root.previewPath) return;
+        const filename = "Snap_" + new Date().getTime() + ".png";
+        const saveDir = root.cfg_saveDirectory;
+        const destPath = saveDir + "/" + filename;
+
+        Proc.runCommand("save-snap", ["cp", root.previewPath, destPath], function(stdout, exitCode) {
+            if (exitCode === 0) {
+                if (typeof ToastService !== "undefined" && ToastService)
+                    ToastService.showInfo(I18n.tr("Snapshot saved"));
+                root.isPreviewing = false;
+            } else {
+                if (typeof ToastService !== "undefined" && ToastService)
+                    ToastService.showError(I18n.tr("Failed to save snapshot."));
+            }
+        });
+    }
+
+    function performCapture(vOut) {
+        if (!vOut) return;
+        root.startCapture(() => {
+            if (root.cfg_screenFlash) {
+                screenFlashWindow.startFlash();
+            }
+            
+            const tempPath = "/tmp/hand_mirror_snap_" + Date.now() + ".png";
+            const saveDir = root.cfg_saveDirectory;
+            
+            // Ensure directory exists even for preview (so we can save later)
+            Proc.runCommand("mkdir-snaps", ["mkdir", "-p", saveDir], function(stdout, exitCode) {
+                vOut.grabToImage(function(result) {
+                    result.saveToFile(tempPath);
+                    root.previewPath = tempPath;
+                    root.isPreviewing = true;
+                });
+            });
+        });
     }
 
     // Shared camera components to prevent conflict between popout and standalone window
@@ -276,6 +356,21 @@ PluginComponent {
                                 radius: cameraViewPanel.radius
                             }
                         }
+                        
+                        saturation: {
+                            if (root.cfg_filterMode === "grayscale") return -1.0 * root.cfg_filterStrength;
+                            if (root.cfg_filterMode === "sepia") return -0.2 * root.cfg_filterStrength;
+                            return 0.0;
+                        }
+                        contrast: root.cfg_filterMode === "contrast" ? (0.4 * root.cfg_filterStrength) : 0.0
+                        brightness: root.cfg_filterMode === "contrast" ? (0.1 * root.cfg_filterStrength) : 0.0
+                        colorization: root.cfg_filterMode === "sepia" ? root.cfg_filterStrength : 0.0
+                        colorizationColor: "#704214"
+
+                        // Simple denoising via smoothing
+                        blurEnabled: root.cfg_smoothing > 0
+                        blur: root.cfg_smoothing * 0.5 // Subtle blur to soften noise
+                        blurMax: 32
                     }
                 }
 
@@ -376,6 +471,41 @@ PluginComponent {
                     }
                 }
 
+                // Flash toggle button overlay (top right next to snapshot) - only visible in popout mode
+                StyledRect {
+                    width: 28
+                    height: 28
+                    radius: 14
+                    color: flashArea.containsMouse ? Qt.rgba(0, 0, 0, 0.8) : Qt.rgba(0, 0, 0, 0.6)
+                    border.color: "white"
+                    border.width: 1
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.rightMargin: 80
+                    anchors.topMargin: 12
+                    visible: !contentItem.isStandalone && opacity > 0.0
+                    opacity: (!contentItem.isStandalone && cameraHoverHandler.hovered) ? 1.0 : 0.0
+                    Behavior on opacity {
+                        NumberAnimation { duration: 200 }
+                    }
+
+                    DankIcon {
+                        anchors.centerIn: parent
+                        name: root.cfg_screenFlash ? "flash_on" : "offline_bolt"
+                        size: 14
+                        color: root.cfg_screenFlash ? Theme.primary : "white"
+                    }
+
+                    MouseArea {
+                        id: flashArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: {
+                            root.toggleFlash();
+                        }
+                    }
+                }
+
                 // Snapshot button overlay (top right next to pin) - only visible in popout mode
                 StyledRect {
                     width: 28
@@ -407,30 +537,7 @@ PluginComponent {
                         onEntered: parent.color = Qt.rgba(0, 0, 0, 0.8)
                         onExited: parent.color = Qt.rgba(0, 0, 0, 0.6)
                         onClicked: {
-                            root.startCapture(() => {
-                                if (root.cfg_screenFlash) {
-                                    screenFlashWindow.startFlash();
-                                }
-                                
-                                const filename = "Snap_" + new Date().getTime() + ".png";
-                                const saveDir = root.cfg_saveDirectory;
-                                
-                                Proc.runCommand("mkdir-snaps", ["mkdir", "-p", saveDir], function(stdout, exitCode) {
-                                    if (exitCode === 0) {
-                                        videoOutput.grabToImage(function(result) {
-                                            const fullPath = saveDir + "/" + filename;
-                                            result.saveToFile(fullPath);
-                                            if (typeof ToastService !== "undefined" && ToastService) {
-                                                ToastService.showInfo(I18n.tr("Snapshot saved"), fullPath);
-                                            }
-                                        });
-                                    } else {
-                                        if (typeof ToastService !== "undefined" && ToastService) {
-                                            ToastService.showError(I18n.tr("Error"), I18n.tr("Could not create snaps directory."));
-                                        }
-                                    }
-                                });
-                            });
+                            root.performCapture(videoOutput);
                         }
                     }
                 }
@@ -478,10 +585,68 @@ PluginComponent {
                         }
 
                         onPositionChanged: (mouse) => {
+                            if (!pressed) return;
                             const deltaX = mouse.x - startX;
                             const targetWidth = Math.max(180, Math.min(1080, startWidth + deltaX));
                             root.popoutWidth = targetWidth;
-                            root.popoutHeight = Math.round(targetWidth / root.activeRatio);
+                            root.popoutHeight = Math.round(targetWidth / root.activeRatio) + (root.isPreviewing ? 48 : 0);
+                        }
+
+                        onReleased: {
+                            const targetScale = Math.round((root.popoutWidth / 360.0) * 100);
+                            if (root.pluginService) {
+                                root.pluginService.savePluginData(root.pluginId, "popoutScale", targetScale);
+                            }
+                        }
+                    }
+                }
+
+                // Resize Grip (bottom left)
+                Canvas {
+                    id: resizeCanvasLeft
+                    width: 12
+                    height: 12
+                    anchors.left: parent.left
+                    anchors.bottom: parent.bottom
+                    anchors.leftMargin: 6
+                    anchors.bottomMargin: 6
+                    opacity: cameraHoverHandler.hovered ? 1.0 : 0.0
+                    visible: opacity > 0.0
+                    Behavior on opacity {
+                        NumberAnimation { duration: 200 }
+                    }
+
+                    onPaint: {
+                        const ctx = getContext("2d");
+                        ctx.clearRect(0, 0, width, height);
+                        ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.6);
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0); ctx.lineTo(12, 12);
+                        ctx.moveTo(0, 4); ctx.lineTo(8, 12);
+                        ctx.moveTo(0, 8); ctx.lineTo(4, 12);
+                        ctx.stroke();
+                    }
+
+                    MouseArea {
+                        id: resizeGripLeft
+                        anchors.fill: parent
+                        cursorShape: Qt.SizeBDiagCursor
+                        
+                        property real startX
+                        property real startWidth
+
+                        onPressed: (mouse) => {
+                            startX = mouse.x;
+                            startWidth = root.popoutWidth;
+                        }
+
+                        onPositionChanged: (mouse) => {
+                            if (!pressed) return;
+                            const deltaX = startX - mouse.x; // Left side drag: moving left increases width
+                            const targetWidth = Math.max(180, Math.min(1080, startWidth + deltaX));
+                            root.popoutWidth = targetWidth;
+                            root.popoutHeight = Math.round(targetWidth / root.activeRatio) + (root.isPreviewing ? 48 : 0);
                         }
 
                         onReleased: {
@@ -506,6 +671,91 @@ PluginComponent {
                         font.pixelSize: 72
                         font.bold: true
                         color: "white"
+                    }
+                }
+
+                // 2. Snapshot Preview Overlay
+                Rectangle {
+                    id: previewOverlay
+                    anchors.fill: parent
+                    visible: root.isPreviewing
+                    radius: cameraViewPanel.radius
+                    color: Theme.surfaceContainerHighest
+                    z: 500
+
+                    Column {
+                        anchors.fill: parent
+                        spacing: 0
+
+                        Item {
+                            width: parent.width
+                            height: parent.height - (root.isPreviewing ? 48 : 0)
+                            clip: true
+
+                            Image {
+                                id: previewImg
+                                anchors.fill: parent
+                                source: root.previewPath ? "file://" + root.previewPath : ""
+                                fillMode: Image.PreserveAspectFit
+                                asynchronous: true
+                                
+                                // Ensure preview respects mirror setting
+                                transform: Scale {
+                                    origin.x: previewImg.width / 2
+                                    origin.y: previewImg.height / 2
+                                    xScale: root.cfg_mirror ? -1 : 1
+                                }
+
+                                // Drag & Drop support
+                                MouseArea {
+                                    id: dragArea
+                                    anchors.fill: parent
+                                    drag.target: dragDummy
+                                }
+
+                                Item {
+                                    id: dragDummy
+                                    Drag.active: dragArea.drag.active
+                                    Drag.keys: ["text/uri-list"]
+                                    Drag.mimeData: { "text/uri-list": "file://" + root.previewPath }
+                                }
+                            }
+                        }
+
+                        // Bottom Action Bar
+                        Rectangle {
+                            width: parent.width
+                            height: 48
+                            color: Qt.rgba(0, 0, 0, 0.6)
+                            
+                            Separator { anchors.top: parent.top }
+
+                            Row {
+                                anchors.centerIn: parent
+                                spacing: Theme.spacingM
+
+                                DankActionButton {
+                                    iconName: "close"
+                                    iconColor: Theme.error
+                                    tooltipText: I18n.tr("Discard")
+                                    onClicked: root.discardPreview()
+                                }
+
+                                DankActionButton {
+                                    iconName: "content_copy"
+                                    iconColor: "white"
+                                    tooltipText: I18n.tr("Copy to Clipboard")
+                                    onClicked: root.copyPreview()
+                                }
+
+                                DankActionButton {
+                                    iconName: "save"
+                                    iconColor: Theme.primary
+                                    tooltipText: I18n.tr("Save Image")
+                                    onClicked: root.savePreview()
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -643,7 +893,42 @@ PluginComponent {
                 }
             }
 
-            // Snapshot button (top right of standalone window, next to pin)
+            // Flash toggle button (standalone window)
+            StyledRect {
+                width: 28
+                height: 28
+                radius: 14
+                color: flashAreaStandalone.containsMouse ? Qt.rgba(0, 0, 0, 0.8) : Qt.rgba(0, 0, 0, 0.6)
+                border.color: "white"
+                border.width: 1
+                anchors.right: parent.right
+                anchors.rightMargin: 80
+                anchors.top: parent.top
+                anchors.topMargin: 12
+                opacity: windowHoverHandler.hovered ? 1.0 : 0.0
+                visible: opacity > 0.0
+                Behavior on opacity {
+                    NumberAnimation { duration: 200 }
+                }
+
+                DankIcon {
+                    anchors.centerIn: parent
+                    name: root.cfg_screenFlash ? "flash_on" : "offline_bolt"
+                    size: 14
+                    color: root.cfg_screenFlash ? Theme.primary : "white"
+                }
+
+                MouseArea {
+                    id: flashAreaStandalone
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: {
+                        root.toggleFlash();
+                    }
+                }
+            }
+
+            // Snapshot button (top right of standalone window, next to flash)
             StyledRect {
                 width: 28
                 height: 28
@@ -652,7 +937,7 @@ PluginComponent {
                 border.color: "white"
                 border.width: 1
                 anchors.right: parent.right
-                anchors.rightMargin: 80
+                anchors.rightMargin: 114
                 anchors.top: parent.top
                 anchors.topMargin: 12
                 opacity: windowHoverHandler.hovered ? 1.0 : 0.0
@@ -675,37 +960,9 @@ PluginComponent {
                     onEntered: parent.color = Qt.rgba(0, 0, 0, 0.8)
                     onExited: parent.color = Qt.rgba(0, 0, 0, 0.6)
                     onClicked: {
-                        root.startCapture(() => {
-                            if (root.cfg_screenFlash) {
-                                screenFlashWindow.startFlash();
-                            }
-                            
-                            const filename = "Snap_" + new Date().getTime() + ".png";
-                            let saveDir = root.cfg_saveDirectory.trim();
-                            if (!saveDir) {
-                                saveDir = Quickshell.env("HOME") + "/Pictures/Snaps";
-                            } else if (saveDir.startsWith("~/")) {
-                                saveDir = Quickshell.env("HOME") + saveDir.substring(1);
-                            }
-                            
-                            Proc.runCommand("mkdir-snaps", ["mkdir", "-p", saveDir], function(stdout, exitCode) {
-                                if (exitCode === 0) {
-                                    if (standaloneLoader.item && standaloneLoader.item.videoOutput) {
-                                        standaloneLoader.item.videoOutput.grabToImage(function(result) {
-                                            const fullPath = saveDir + "/" + filename;
-                                            result.saveToFile(fullPath);
-                                            if (typeof ToastService !== "undefined" && ToastService) {
-                                                ToastService.showInfo(I18n.tr("Snapshot saved"), fullPath);
-                                            }
-                                        });
-                                    }
-                                } else {
-                                    if (typeof ToastService !== "undefined" && ToastService) {
-                                        ToastService.showError(I18n.tr("Error"), I18n.tr("Could not create snaps directory."));
-                                    }
-                                }
-                            });
-                        });
+                        if (standaloneLoader.item) {
+                            root.performCapture(standaloneLoader.item.videoOutput);
+                        }
                     }
                 }
             }
