@@ -89,6 +89,30 @@ PluginComponent {
         }
     }
 
+    IpcHandler {
+        target: "handMirror"
+
+        function toggle() : string {
+            if (standaloneWindow.visible) {
+                standaloneWindow.visible = false;
+                return "CLOSED_PINNED";
+            }
+            root.triggerPopout();
+            return "TOGGLED_POPOUT";
+        }
+
+        function togglePin() : string {
+            if (standaloneWindow.visible) {
+                standaloneWindow.visible = false;
+                return "UNPINNED";
+            } else {
+                root.closePopout();
+                standaloneWindow.visible = true;
+                return "PINNED";
+            }
+        }
+    }
+
     // Shared camera components to prevent conflict between popout and standalone window
     MediaDevices {
         id: mediaDevices

@@ -41,6 +41,23 @@ git clone https://github.com/hthienloc/dms-hand-mirror ~/.config/DankMaterialShe
 - **Right Drag:** Pan zoom focal position.
 - **Scroll Wheel:** Adjust digital zoom.
 
+## IPC Commands
+
+Use `dms ipc call handMirror <command>` to control the mirror from scripts or keybindings.
+
+| Command | Description |
+|---------|-------------|
+| `toggle` | Toggle popout preview |
+| `togglePin` | Toggle floating window (pin to desktop) |
+
+### Keybinding examples (Niri)
+
+```kdl
+binds {
+    Mod+M { spawn "dms" "ipc" "call" "handMirror" "toggle"; }
+}
+```
+
 ## Requirements
 
 - DankMaterialShell >= 1.5
@@ -53,7 +70,7 @@ git clone https://github.com/hthienloc/dms-hand-mirror ~/.config/DankMaterialShe
 - [ ] **Drag-and-Drop:** Drag snapshots directly into other apps (Discord, Telegram, etc.).
 - [ ] **Recording:** Support for capturing short video clips or GIFs.
 - [ ] **QR/OCR Integration:** Quickly scan QR codes or extract text from the preview.
-- [ ] **Global Hotkey:** Toggle the mirror window with a system-wide shortcut.
+- [x] **Global Hotkey:** Toggle the mirror window with a system-wide shortcut.
 
 ## License
 
