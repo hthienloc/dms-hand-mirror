@@ -4,6 +4,7 @@ import QtQuick.Effects
 import QtMultimedia
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Io
 import qs.Common
 import qs.Widgets
 import qs.Modules.Plugins

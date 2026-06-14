@@ -70,6 +70,7 @@ binds {
 - [ ] **Drag-and-Drop:** Drag snapshots directly into other apps (Discord, Telegram, etc.).
 - [ ] **Recording:** Support for capturing short video clips or GIFs.
 - [ ] **QR/OCR Integration:** Quickly scan QR codes or extract text from the preview.
+- [ ] **Customizable Popout Position:** Option to choose where the popout appears (Left, Center, Right, or near the bar icon).
 - [x] **Global Hotkey:** Toggle the mirror window with a system-wide shortcut.
 
 ## License
