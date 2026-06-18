@@ -476,7 +476,7 @@ PluginComponent {
                     }
                 }
 
-                // Flash toggle button overlay (top right next to snapshot) - only visible in popout mode
+                // Flash toggle button overlay (top right) - only visible in popout mode
                 StyledRect {
                     width: 28
                     height: 28
@@ -486,7 +486,7 @@ PluginComponent {
                     border.width: 1
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    anchors.rightMargin: 80
+                    anchors.rightMargin: 114
                     anchors.topMargin: 12
                     visible: !contentItem.isStandalone && opacity > 0.0
                     opacity: (!contentItem.isStandalone && cameraHoverHandler.hovered) ? 1.0 : 0.0
@@ -511,7 +511,7 @@ PluginComponent {
                     }
                 }
 
-                // Snapshot button overlay (top right next to pin) - only visible in popout mode
+                // Snapshot button — captures photo with current delay setting
                 StyledRect {
                     width: 28
                     height: 28
@@ -548,10 +548,10 @@ PluginComponent {
                     }
                 }
 
-                // Timer button overlay — cycles delay on each click
+                // Timer button — cycles capture delay on each click
                 StyledRect {
                     id: timerBtn
-                    width: 28
+                    width: 32
                     height: 28
                     radius: 14
                     color: timerArea.containsMouse ? Qt.rgba(0, 0, 0, 0.8) : Qt.rgba(0, 0, 0, 0.6)
@@ -559,7 +559,7 @@ PluginComponent {
                     border.width: 1
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    anchors.rightMargin: 114
+                    anchors.rightMargin: 80
                     anchors.topMargin: 12
                     visible: !contentItem.isStandalone && opacity > 0.0
                     opacity: (!contentItem.isStandalone && cameraHoverHandler.hovered) ? 1.0 : 0.0
@@ -567,26 +567,15 @@ PluginComponent {
                         NumberAnimation { duration: 200 }
                     }
 
-                    readonly property var delays: [0, 3, 5, 10]
+                    readonly property var delays: ["0s", "3s", "5s", "10s"]
                     property int delayIndex: 0
 
-                    DankIcon {
-                        anchors.centerIn: parent
-                        name: timerBtn.delays[timerBtn.delayIndex] === 0 ? "photo_camera" : "timer"
-                        size: 14
-                        color: "white"
-                    }
-
                     StyledText {
-                        text: timerBtn.delays[timerBtn.delayIndex] === 0 ? "" : timerBtn.delays[timerBtn.delayIndex] + "s"
-                        font.pixelSize: 7
+                        text: timerBtn.delays[timerBtn.delayIndex]
+                        font.pixelSize: 9
                         font.bold: true
                         color: "white"
-                        anchors.top: parent.top
-                        anchors.right: parent.right
-                        anchors.topMargin: 2
-                        anchors.rightMargin: 2
-                        visible: timerBtn.delays[timerBtn.delayIndex] !== 0
+                        anchors.centerIn: parent
                     }
 
                     MouseArea {
@@ -596,14 +585,8 @@ PluginComponent {
                         onEntered: parent.color = Qt.rgba(0, 0, 0, 0.8)
                         onExited: parent.color = Qt.rgba(0, 0, 0, 0.6)
                         onClicked: {
-                            // Cycle to next delay
                             timerBtn.delayIndex = (timerBtn.delayIndex + 1) % timerBtn.delays.length;
-                            // If selecting a delay > 0, show feedback
-                            if (timerBtn.delays[timerBtn.delayIndex] === 0) {
-                                root.pluginService.savePluginData(root.pluginId, "captureDelay", "0");
-                            } else {
-                                root.pluginService.savePluginData(root.pluginId, "captureDelay", String(timerBtn.delays[timerBtn.delayIndex]));
-                            }
+                            root.pluginService.savePluginData(root.pluginId, "captureDelay", timerBtn.delays[timerBtn.delayIndex].replace("s", ""));
                         }
                     }
                 }
