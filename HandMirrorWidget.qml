@@ -90,8 +90,8 @@ PluginComponent {
         }
     }
 
-    function startCapture(finishedCallback) {
-        const delay = parseInt(root.pluginData.captureDelay ?? "0");
+    function startCapture(finishedCallback, delaySec) {
+        const delay = delaySec !== undefined ? delaySec : parseInt(root.pluginData.captureDelay ?? "0");
         if (delay > 0) {
             root.countdownValue = delay;
             root.isCountingDown = true;
@@ -536,31 +536,109 @@ PluginComponent {
                         color: "white"
                     }
 
-                    property bool _longPressTriggered: false
-
-                    Timer {
-                        id: longPressTimer
-                        interval: 800
-                        onTriggered: {
-                            snapArea._longPressTriggered = true;
-                            root.performCapture(videoOutput, false);
-                        }
-                    }
-
                     MouseArea {
                         id: snapArea
                         anchors.fill: parent
                         hoverEnabled: true
                         onEntered: parent.color = Qt.rgba(0, 0, 0, 0.8)
                         onExited: parent.color = Qt.rgba(0, 0, 0, 0.6)
-                        onPressed: {
-                            _longPressTriggered = false;
-                            longPressTimer.start();
+                        onClicked: {
+                            root.performCapture(videoOutput, true);
                         }
-                        onReleased: {
-                            longPressTimer.stop();
-                            if (!_longPressTriggered) {
-                                root.performCapture(videoOutput, true);
+                    }
+                }
+
+                // Timer button overlay — opens delay dropdown
+                StyledRect {
+                    id: timerBtn
+                    width: 28
+                    height: 28
+                    radius: 14
+                    color: timerArea.containsMouse ? Qt.rgba(0, 0, 0, 0.8) : Qt.rgba(0, 0, 0, 0.6)
+                    border.color: "white"
+                    border.width: 1
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.rightMargin: 114
+                    anchors.topMargin: 12
+                    visible: !contentItem.isStandalone && opacity > 0.0
+                    opacity: (!contentItem.isStandalone && cameraHoverHandler.hovered) ? 1.0 : 0.0
+                    Behavior on opacity {
+                        NumberAnimation { duration: 200 }
+                    }
+
+                    DankIcon {
+                        anchors.centerIn: parent
+                        name: "timer"
+                        size: 14
+                        color: "white"
+                    }
+
+                    MouseArea {
+                        id: timerArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onEntered: parent.color = Qt.rgba(0, 0, 0, 0.8)
+                        onExited: parent.color = Qt.rgba(0, 0, 0, 0.6)
+                        onClicked: {
+                            delayPopup.open();
+                        }
+                    }
+
+                    Popup {
+                        id: delayPopup
+                        y: -delayPopupColumn.implicitHeight - 6
+                        x: -(delayPopupColumn.implicitWidth - parent.width) / 2
+                        padding: 0
+                        closePolicy: Popup.CloseOnPressOutside | Popup.CloseOnEscape
+                        background: Rectangle {
+                            color: "transparent"
+                        }
+                        contentItem: StyledRect {
+                            color: Theme.surfaceContainer
+                            radius: Theme.cornerRadius
+                            border.color: Theme.withAlpha(Theme.outline, 0.15)
+                            border.width: 1
+                            padding: 4
+
+                            Column {
+                                id: delayPopupColumn
+                                spacing: 2
+
+                                Repeater {
+                                    model: [
+                                        { label: I18n.tr("Instant"), value: 0 },
+                                        { label: I18n.tr("3s"),     value: 3 },
+                                        { label: I18n.tr("5s"),     value: 5 },
+                                        { label: I18n.tr("10s"),    value: 10 },
+                                    ]
+
+                                    delegate: ItemDelegate {
+                                        required property var modelData
+                                        width: 100
+                                        height: 28
+                                        contentItem: StyledText {
+                                            text: modelData.label
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            color: Theme.surfaceText
+                                            anchors.centerIn: parent
+                                        }
+                                        background: Rectangle {
+                                            color: hovered ? Theme.withAlpha(Theme.primary, 0.1) : "transparent"
+                                            radius: 4
+                                        }
+                                        onClicked: {
+                                            delayPopup.close();
+                                            if (modelData.value === 0) {
+                                                root.performCapture(videoOutput, true);
+                                            } else {
+                                                root.startCapture(function() {
+                                                    root.performCapture(videoOutput, true);
+                                                }, modelData.value);
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
