@@ -613,28 +613,33 @@ PluginComponent {
                                         { label: I18n.tr("10s"),    value: 10 },
                                     ]
 
-                                    delegate: ItemDelegate {
+                                    delegate: Rectangle {
                                         required property var modelData
                                         width: 100
                                         height: 28
-                                        contentItem: StyledText {
+                                        radius: 4
+                                        color: delMouse.containsMouse ? Theme.withAlpha(Theme.primary, 0.1) : "transparent"
+
+                                        StyledText {
                                             text: modelData.label
                                             font.pixelSize: Theme.fontSizeSmall
                                             color: Theme.surfaceText
                                             anchors.centerIn: parent
                                         }
-                                        background: Rectangle {
-                                            color: hovered ? Theme.withAlpha(Theme.primary, 0.1) : "transparent"
-                                            radius: 4
-                                        }
-                                        onClicked: {
-                                            delayPopup.close();
-                                            if (modelData.value === 0) {
-                                                root.performCapture(videoOutput, true);
-                                            } else {
-                                                root.startCapture(function() {
+
+                                        MouseArea {
+                                            id: delMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            onClicked: {
+                                                delayPopup.close();
+                                                if (modelData.value === 0) {
                                                     root.performCapture(videoOutput, true);
-                                                }, modelData.value);
+                                                } else {
+                                                    root.startCapture(function() {
+                                                        root.performCapture(videoOutput, true);
+                                                    }, modelData.value);
+                                                }
                                             }
                                         }
                                     }
