@@ -543,12 +543,12 @@ PluginComponent {
                         onEntered: parent.color = Qt.rgba(0, 0, 0, 0.8)
                         onExited: parent.color = Qt.rgba(0, 0, 0, 0.6)
                         onClicked: {
-                            root.performCapture(videoOutput, true);
+                            root.performCapture(videoOutput);
                         }
                     }
                 }
 
-                // Timer button overlay — opens delay dropdown
+                // Timer button overlay — cycles delay on each click
                 StyledRect {
                     id: timerBtn
                     width: 28
@@ -567,11 +567,26 @@ PluginComponent {
                         NumberAnimation { duration: 200 }
                     }
 
+                    readonly property var delays: [0, 3, 5, 10]
+                    property int delayIndex: 0
+
                     DankIcon {
                         anchors.centerIn: parent
-                        name: "timer"
+                        name: timerBtn.delays[timerBtn.delayIndex] === 0 ? "photo_camera" : "timer"
                         size: 14
                         color: "white"
+                    }
+
+                    StyledText {
+                        text: timerBtn.delays[timerBtn.delayIndex] === 0 ? "" : timerBtn.delays[timerBtn.delayIndex] + "s"
+                        font.pixelSize: 7
+                        font.bold: true
+                        color: "white"
+                        anchors.top: parent.top
+                        anchors.right: parent.right
+                        anchors.topMargin: 2
+                        anchors.rightMargin: 2
+                        visible: timerBtn.delays[timerBtn.delayIndex] !== 0
                     }
 
                     MouseArea {
@@ -581,69 +596,13 @@ PluginComponent {
                         onEntered: parent.color = Qt.rgba(0, 0, 0, 0.8)
                         onExited: parent.color = Qt.rgba(0, 0, 0, 0.6)
                         onClicked: {
-                            delayPopup.open();
-                        }
-                    }
-
-                    Popup {
-                        id: delayPopup
-                        y: -delayPopupColumn.implicitHeight - 6
-                        x: -(delayPopupColumn.implicitWidth - parent.width) / 2
-                        padding: 0
-                        closePolicy: Popup.CloseOnPressOutside | Popup.CloseOnEscape
-                        background: Rectangle {
-                            color: "transparent"
-                        }
-                        contentItem: StyledRect {
-                            color: Theme.surfaceContainer
-                            radius: Theme.cornerRadius
-                            border.color: Theme.withAlpha(Theme.outline, 0.15)
-                            border.width: 1
-                            padding: 4
-
-                            Column {
-                                id: delayPopupColumn
-                                spacing: 2
-
-                                Repeater {
-                                    model: [
-                                        { label: I18n.tr("Instant"), value: 0 },
-                                        { label: I18n.tr("3s"),     value: 3 },
-                                        { label: I18n.tr("5s"),     value: 5 },
-                                        { label: I18n.tr("10s"),    value: 10 },
-                                    ]
-
-                                    delegate: Rectangle {
-                                        required property var modelData
-                                        width: 100
-                                        height: 28
-                                        radius: 4
-                                        color: delMouse.containsMouse ? Theme.withAlpha(Theme.primary, 0.1) : "transparent"
-
-                                        StyledText {
-                                            text: modelData.label
-                                            font.pixelSize: Theme.fontSizeSmall
-                                            color: Theme.surfaceText
-                                            anchors.centerIn: parent
-                                        }
-
-                                        MouseArea {
-                                            id: delMouse
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            onClicked: {
-                                                delayPopup.close();
-                                                if (modelData.value === 0) {
-                                                    root.performCapture(videoOutput, true);
-                                                } else {
-                                                    root.startCapture(function() {
-                                                        root.performCapture(videoOutput, true);
-                                                    }, modelData.value);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                            // Cycle to next delay
+                            timerBtn.delayIndex = (timerBtn.delayIndex + 1) % timerBtn.delays.length;
+                            // If selecting a delay > 0, show feedback
+                            if (timerBtn.delays[timerBtn.delayIndex] === 0) {
+                                root.pluginService.savePluginData(root.pluginId, "captureDelay", "0");
+                            } else {
+                                root.pluginService.savePluginData(root.pluginId, "captureDelay", String(timerBtn.delays[timerBtn.delayIndex]));
                             }
                         }
                     }
