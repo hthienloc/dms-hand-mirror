@@ -521,7 +521,7 @@ PluginComponent {
                     border.width: 1
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    anchors.rightMargin: 46
+                    anchors.rightMargin: 80
                     anchors.topMargin: 12
                     visible: !contentItem.isStandalone && opacity > 0.0
                     opacity: (!contentItem.isStandalone && cameraHoverHandler.hovered) ? 1.0 : 0.0
@@ -559,7 +559,7 @@ PluginComponent {
                     border.width: 1
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    anchors.rightMargin: 80
+                    anchors.rightMargin: 46
                     anchors.topMargin: 12
                     visible: !contentItem.isStandalone && opacity > 0.0
                     opacity: (!contentItem.isStandalone && cameraHoverHandler.hovered) ? 1.0 : 0.0
