@@ -173,9 +173,9 @@ PluginComponent {
         });
     }
 
-    function performCapture(vOut) {
+    function performCapture(vOut, instant) {
         if (!vOut) return;
-        root.startCapture(() => {
+        var doCapture = function() {
             if (root.cfg_screenFlash) {
                 screenFlashWindow.startFlash();
             }
@@ -191,7 +191,12 @@ PluginComponent {
                     root.isPreviewing = true;
                 });
             });
-        });
+        };
+        if (instant) {
+            doCapture();
+        } else {
+            root.startCapture(doCapture);
+        }
     }
 
     // Shared camera components to prevent conflict between popout and standalone window
@@ -530,14 +535,33 @@ PluginComponent {
                         size: 14
                         color: "white"
                     }
-                                   MouseArea {
+
+                    property bool _longPressTriggered: false
+
+                    Timer {
+                        id: longPressTimer
+                        interval: 800
+                        onTriggered: {
+                            snapArea._longPressTriggered = true;
+                            root.performCapture(videoOutput, false);
+                        }
+                    }
+
+                    MouseArea {
                         id: snapArea
                         anchors.fill: parent
                         hoverEnabled: true
                         onEntered: parent.color = Qt.rgba(0, 0, 0, 0.8)
                         onExited: parent.color = Qt.rgba(0, 0, 0, 0.6)
-                        onClicked: {
-                            root.performCapture(videoOutput);
+                        onPressed: {
+                            _longPressTriggered = false;
+                            longPressTimer.start();
+                        }
+                        onReleased: {
+                            longPressTimer.stop();
+                            if (!_longPressTriggered) {
+                                root.performCapture(videoOutput, true);
+                            }
                         }
                     }
                 }
