@@ -230,7 +230,7 @@ PluginComponent {
 
             DankIcon {
                 anchors.centerIn: parent
-                name: "camera_front"
+                name: "photo_camera"
                 size: Theme.iconSizeSmall
                 color: (root.pluginPopout && root.pluginPopout.shouldBeVisible) ? Theme.primary : Theme.surfaceText
             }
@@ -259,7 +259,7 @@ PluginComponent {
 
             DankIcon {
                 anchors.centerIn: parent
-                name: "camera_front"
+                name: "photo_camera"
                 size: Theme.iconSizeSmall
                 color: (root.pluginPopout && root.pluginPopout.shouldBeVisible) ? Theme.primary : Theme.surfaceText
             }
