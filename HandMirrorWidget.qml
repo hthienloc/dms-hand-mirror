@@ -844,8 +844,8 @@ PluginComponent {
     FloatingWindow {
         id: standaloneWindow
         title: I18n.tr("Hand Mirror")
-        width: Math.round(360 * (root.cfg_windowScale / 100.0))
-        height: Math.round(width / root.activeRatio)
+        implicitWidth: Math.round(360 * (root.cfg_windowScale / 100.0))
+        implicitHeight: Math.round(implicitWidth / root.activeRatio)
         color: "transparent"
         visible: false
 
